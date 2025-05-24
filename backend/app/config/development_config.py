@@ -98,10 +98,10 @@ class Settings(BaseSettings):
 
     #  MYSQL配置项
     MYSQL_USERNAME: str = os.getenv("MYSQL_USERNAME", "root")
-    MYSQL_PASSWORD: str = os.getenv("MYSQL_PASSWORD", "")
+    MYSQL_PASSWORD: str = os.getenv("MYSQL_PASSWORD", "123456")
     MYSQL_HOST: str = os.getenv("MYSQL_HOST", "localhost")
     MYSQL_PORT: int = os.getenv("MYSQL_PORT", 3306)
-    MYSQL_DATABASE: str = os.getenv("MYSQL_DATABASE", "crawlAdmin")
+    MYSQL_DATABASE: str = os.getenv("MYSQL_DATABASE", "crawladmin")
 
     # MYSQL 连接多个数据库
     DATABASE_URL = f"mysql://{MYSQL_USERNAME}:{parse.quote_plus(MYSQL_PASSWORD)}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}?charset=utf8mb4"
@@ -116,8 +116,8 @@ class Settings(BaseSettings):
     ]
 
     # 默认生成用户数据
-    FIRST_SUPERUSER: str = "pai"
-    FIRST_MALL: EmailStr = "admin@163.com"
+    FIRST_SUPERUSER: str = "admin"
+    FIRST_MALL: EmailStr = "admin@qq.com"
     FIRST_SUPERUSER_PASSWORD: str = "123456"
     FIRST_ROLE: int = 999  # 超级管理员
     FIRST_AVATAR: AnyHttpUrl = "https://avatar-static.segmentfault.com/106/603/1066030767-5d396cc440024_huge256"

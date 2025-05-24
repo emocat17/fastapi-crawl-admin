@@ -1,29 +1,3 @@
-# Fastapi Crawl
-![Fastapi Crawl](https://img.shields.io/badge/Python-3.8-green)
-![Fastapi Crawl](https://img.shields.io/badge/Celery-5.0.5-blue)
-![Fastapi Crawl](https://img.shields.io/badge/Fastapi-0.4.9-red)
-![Fastapi Crawl](https://img.shields.io/badge/uvicorn-0.2.2-yellow)
-![Fastapi Crawl](https://img.shields.io/badge/pydantic-0.2.2-brightgreen)
-![Fastapi Crawl](https://img.shields.io/badge/fabric-0.1.13-yellow)
-![Fastapi Crawl](https://img.shields.io/badge/Mysql-5.7-yellow)
-![Fastapi Crawl](https://img.shields.io/badge/paramiko-0.0-yellow)
-
-
--   [x] 登录/注销
--   [x] 远程批量部署和调用
--   [x] `WebSocket` 任务日志
--   [x] 新增节点、测试节点
--   [ ] 展示节点已安装依赖服务/详细指标
--   [ ] `Redis` 缓存
--   [ ] 权限管理
--   [ ] 站内消息推送
--   [ ] `MQ`/`AQS`/`Celery`
--   [ ] `Docker`集成
--   [x] ~~fabric 版本差异过大故放弃~~  `paramiko`
--   [ ] ~~ssh 密码登录~~  `ssh key` 免密登录
--   [ ] `Scrapy` 集成
-
-
 ## 依赖
 
 ```
@@ -148,6 +122,15 @@ pip install fastapi
 [comment]: <> (```)
 
 [comment]: <> (</details>)
+## 建立表
+```sh
+CREATE DATABASE crawladmin CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+用户名root,密码123456
+
+## 
+- 清理并重新执行 Alembic 命令：
+  - （重要）删除旧的迁移文件（如果之前生成过错误的）：进入 backend/alembic/versions/ 目录，删除里面所有的 .py 迁移脚本文件（除了 __init__.py 如果有的话）。这确保你从一个干净的状态开始生成迁移。
 
 
 ## alembic 生成表
@@ -166,13 +149,11 @@ alembic revision --autogenerate -m "init commit"
 ### 生成初始化账号密码
 
 ```shell
-cd app
 python initial_data.py
 ```
 
 ```shell
-username: adsmin@163.com
-password: 123456
+python main.py
 ```
 
 

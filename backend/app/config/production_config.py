@@ -101,7 +101,7 @@ class Settings(BaseSettings):
     MYSQL_PASSWORD: str = os.getenv("MYSQL_PASSWORD", "")
     MYSQL_HOST: str = os.getenv("MYSQL_HOST", "localhost")
     MYSQL_PORT: int = os.getenv("MYSQL_PORT", 3306)
-    MYSQL_DATABASE: str = os.getenv("MYSQL_DATABASE", "crawlAdmin")
+    MYSQL_DATABASE: str = os.getenv("MYSQL_DATABASE", "crawladmin")
 
     # MYSQL 连接多个数据库
     DATABASE_URL = f"mysql://{MYSQL_USERNAME}:{parse.quote_plus(MYSQL_PASSWORD)}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}?charset=utf8mb4"
