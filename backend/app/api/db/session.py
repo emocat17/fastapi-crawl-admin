@@ -32,6 +32,13 @@ SessionLocal = sessionmaker(bind=engine)
 # 初始化 mysql 连接
 import databases
 
+
+if not settings.DATABASE_URL:
+    raise ValueError("settings.DATABASE_URL is not configured!")
+
+# 调试信息，确认 URL 的内容
+# print(f"---------------------- Attempting to connect to MySQL using URL from settings.DATABASE_URL: {settings.DATABASE_URL} ---------------")
+
 # f"mysql://root:{parse.quote_plus('')}@127.0.0.1:3306/crawlAdmin?charset=utf8mb4"
 database = databases.Database(settings.DATABASE_URL)  # 申明一个测试对象
 

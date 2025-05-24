@@ -6,7 +6,7 @@ import asyncio
 import time
 import traceback
 
-import aioredis
+# import aioredis # 不再直接需要 aioredis 的顶级导入，除非其他地方用
 from fastapi import FastAPI, Request, Depends
 from fastapi.exceptions import RequestValidationError, ValidationError
 from fastapi_cache import FastAPICache
@@ -25,13 +25,17 @@ from app.api.db.session import database, __initMasterHost, get_db
 from app.config import settings
 from .apiV1.api import api_v1_router
 from .apiV1.core.spiderStatus.getStatus import getSpiderStatus
-from .db.redisDB import RedisCore
+# 【修改点1】: 假设你的 RedisCore 定义在 .db.redisDB (或你之前提供的那个文件)
+from .db.redisDB import RedisCore # RedisCore 现在管理异步客户端
 from .logger import logger
 from .models.proTask import Tasks
 from .utils import responseCode
 from .utils.customExc import PostParamsError, UserNotFound, UserTokenError
 from urllib.parse import quote
 
+# 【修改点2】: 在模块级别创建 RedisCore 实例
+# 这个实例将在 startup 和 shutdown 事件中使用
+redis_manager = RedisCore()
 
 def create_app():
     """
@@ -51,7 +55,7 @@ def create_app():
 
     # 其余的一些全局配置可以写在这里 多了可以考虑拆分到其他文件夹
 
-    register_redis(app)
+    register_redis(app) # 使用全局的 redis_manager
 
     # 注册mysql
     register_mysql(app)
@@ -85,21 +89,29 @@ def create_app():
 def register_redis(app: FastAPI):
     @app.on_event("startup")
     async def startup():
-        redis = await RedisCore().get_redis_pool()
+        # 【修改点3】: 使用全局的 redis_manager，并调用 get_redis_client
+        # get_redis_client 会在内部创建或返回已存在的异步 redis 客户端
+        async_redis_client = await redis_manager.get_redis_client()
 
-        # 先挂上 fastapi 对象
-        app.state.redis = redis
+        # 先挂上 fastapi 对象 (可选，如果你需要在其他地方通过 app.state 访问原始客户端)
+        # 注意：这里挂载的是 redis.asyncio.Redis 客户端实例
+        app.state.redis = async_redis_client
 
         # 初始化缓存 FastAPICache
-        FastAPICache.init(RedisBackend(redis), prefix=settings.REDIS_CACHE_KEY)
-        logger.debug("REDIS 数据库初始化成功 ... DONE")
+        # RedisBackend 需要一个 redis.asyncio.Redis 实例
+        FastAPICache.init(RedisBackend(async_redis_client), prefix=settings.REDIS_CACHE_KEY)
+        logger.debug("REDIS 数据库及 FastAPICache 初始化成功 ... DONE")
 
     @app.on_event('shutdown')
     async def shutdown():
-        app.state.redis.close()
-        await app.state.redis.wait_closed()
+        # 【修改点4】: 使用 redis_manager 的关闭方法
+        await redis_manager.close_redis_client()
+        # app.state.redis.close() 和 await app.state.redis.wait_closed() 不再需要这样直接调用
+        # 因为 redis_manager.close_redis_client() 已经处理了其管理的客户端的关闭
+        logger.debug("Async Redis client closed via RedisManager ... DONE")
 
 
+# --- 以下是你的其他函数，保持不变 ---
 def register_mysql(app: FastAPI):
     # 添加数据库连接和关闭事件
     @app.on_event("startup")
@@ -155,20 +167,6 @@ def register_ws(app: FastAPI):
                     await asyncio.sleep(1)
                     await notifier.send_personal_message(recent_msgs, websocket)
 
-                # while 1:
-                #     if taskInfo.task_status:
-                #         print("完成抛出异常")
-                #         raise WebSocketDisconnect
-                #     # await notifier.send_personal_message({"fuck": "fuck"})
-                #     recent_msgs = query_task_log(taskId)
-                #     await asyncio.sleep(1)
-                #     await notifier.send_personal_message(recent_msgs,websocket)
-                #     _a+=1
-                #     taskInfo = db.query(Tasks).filter(
-                #         Tasks.task_id == taskId).first()
-                #     print(_a)
-                #     print(f"目前抓取状态: {taskInfo.task_status}")
-
         except WebSocketDisconnect:
             notifier.disconnect(websocket)
             print("Bye")
@@ -208,7 +206,7 @@ def register_cors(app: FastAPI):
         app.add_middleware(
             CORSMiddleware,
             allow_origins=["http://localhost:8001",
-                           "http://localhost:8002"],
+                           "http://localhost:8002"], # 你可以从 settings 加载这些
             allow_credentials=True,
             allow_methods=["*"],
             allow_headers=["*"],
@@ -226,87 +224,37 @@ def register_task(app: FastAPI):
 def register_exception(app: FastAPI):
     """
     全局异常捕获
-
-    注意 别手误多敲一个s
-    exception_handler
-    exception_handlers
-    两者有区别
-
-        如果只捕获一个异常 启动会报错
-        @exception_handlers(UserNotFound)
-    TypeError: 'dict' object is not callable
-
-    :param app:
-    :return:
     """
 
     # 自定义异常 捕获
     @app.exception_handler(UserNotFound)
     async def user_not_found_exception_handler(request: Request, exc: UserNotFound):
-        """
-        用户认证未找到
-        :param request:
-        :param exc:
-        :return:
-        """
         logger.error(f"token未知用户\nURL:{request.url}\nHeaders:{request.headers}\n{traceback.format_exc()}")
-
         return responseCode.resp_5001(message=exc.err_desc)
 
     @app.exception_handler(UserTokenError)
     async def user_token_exception_handler(request: Request, exc: UserTokenError):
-        """
-        用户token异常
-        :param request:
-        :param exc:
-        :return:
-        """
         logger.error(f"用户认证异常\nURL:{request.url}\nHeaders:{request.headers}\n{traceback.format_exc()}")
         return responseCode.resp_401(message=exc.err_desc)
 
     @app.exception_handler(PostParamsError)
     async def query_params_exception_handler(request: Request, exc: PostParamsError):
-        """
-        内部查询操作时，其他参数异常
-        :param request:
-        :param exc:
-        :return:
-        """
         logger.error(f"参数查询异常\nURL:{request.url}\nHeaders:{request.headers}\n{traceback.format_exc()}")
-
         return responseCode.resp_400(message=exc.err_desc)
 
     @app.exception_handler(ValidationError)
     async def inner_validation_exception_handler(request: Request, exc: ValidationError):
-        """
-        内部参数验证异常
-        :param request:
-        :param exc:
-        :return:
-        """
         logger.error(f"内部参数验证错误\nURL:{request.url}\nHeaders:{request.headers}\n{traceback.format_exc()}")
         return responseCode.resp_500(message=exc.errors())
 
     @app.exception_handler(RequestValidationError)
     async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
-        """
-        请求参数验证异常
-        :param request:
-        :param exc:
-        :return:
-        """
         logger.error(f"请求参数格式错误\nURL:{request.url}\nHeaders:{request.headers}\n{traceback.format_exc()}")
         return responseCode.resp_422(message=exc.errors())
 
     # 捕获全部异常
     @app.exception_handler(Exception)
     async def all_exception_handler(request: Request, exc: Exception):
-        """
-        全局所有异常
-        :param request:
-        :param exc:
-        :return:
-        """
         logger.error(f"全局异常\nURL:{request.url}\nHeaders:{request.headers}\n{traceback.format_exc()}")
         return responseCode.resp_500(message="服务器内部错误")
 
@@ -314,17 +262,8 @@ def register_exception(app: FastAPI):
 def register_middleware(app: FastAPI):
     """
     请求响应拦截 hook
-
-    https://fastapi.tiangolo.com/tutorial/middleware/
-    :param app:
-    :return:
     """
-
     @app.middleware("http")
     async def logger_request(request: Request, call_next):
-        # https://stackoverflow.com/questions/60098005/fastapi-starlette-get-client-real-ip
-        # logger.info(f"访问记录:{request.method} url:{request.url}\nheaders:{request.headers}\nIP:{request.client.host}")
-
         response = await call_next(request)
-
         return response
